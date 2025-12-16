@@ -1,0 +1,80 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Automated Time Metric</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Automated Time Metric</h1>
+    <h2>Customer Service Time Metrics Tracker</h2>
+
+    <div class="controls">
+      <label class="small">Select Year:</label>
+      <select id="metricYear" onchange="updateYear()">
+        <option>2026</option><option>2027</option><option>2028</option><option>2029</option><option>2030</option>
+      </select>
+
+      <label class="small">Date (Mondays only):</label>
+      <input type="date" id="metricDate">
+
+      <label class="small">Shift:</label>
+      <select id="shift">
+        <option value="">--Select Shift--</option>
+        <option value="Morning">Morning Shift</option>
+        <option value="Night">Night Shift</option>
+      </select>
+
+      <label class="small">Staff:</label>
+      <select id="staff">
+        <option value="">-- Select Staff --</option>
+        <option>Abdubakar Abdullahi</option>
+        <option>Alade Adeola James</option>
+        <option>Jolaiya Adejumoke</option>
+        <option>Olabiyi Oluwafemisii</option>
+      </select>
+
+      <button class="btn btn-add" onclick="addRowFromTop()">Add Entry</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table id="metricsTable">
+        <thead>
+          <tr>
+            <th>Date</th><th>Shift</th><th>Staff</th><th>Complaint</th>
+            <th>Response Time</th><th>Resolution Time</th>
+            <th>Duration (min)</th><th>Status</th><th>Notes</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary">
+      <h3>Summary</h3>
+      <p>
+        Weekly Total Resolved: <span id="weeklyResolved">0</span> |
+        Weekly Pending: <span id="weeklyPending">0</span> |
+        Weekly Downtime: <span id="weeklyDowntime">0</span>
+      </p>
+      <p>Monthly Average Resolution Time: <span id="monthlyAvg">0</span> minutes</p>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-export" onclick="exportToExcel()">Export to Excel</button>
+      <button class="btn btn-preview" onclick="previewData()">Preview</button>
+      <button class="btn btn-backup" onclick="backupData()">Backup Data</button>
+      <button class="btn btn-restore" onclick="document.getElementById('restoreFile').click()">Restore Backup</button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreBackup(event)">
+      <button class="btn btn-clear" onclick="clearAllData()">Clear All Data</button>
+    </div>
+  </div>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
