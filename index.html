@@ -1,80 +1,397 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Automated Time Metric</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <link rel="stylesheet" href="assets/css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<meta charset="UTF-8" />
+<title>Automated Time Metric</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  body {font-family: Arial, sans-serif; margin: 20px; background: #f4f6f9;}
+  h1, h2 {text-align: center; color: #2c3e50;}
+  .container {max-width: 1400px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.1);}
+  .table-wrapper {overflow-x:auto; margin-top:20px;}
+  table {width: 100%; border-collapse: collapse; min-width: 1200px;}
+  th, td {border: 1px solid #ddd; padding: 10px; text-align: center; white-space: nowrap;}
+  th {background: #3498db; color: white;}
+  select, input, button, textarea {padding: 6px; margin: 4px 0; font-size: 14px;}
+  textarea {width: 160px; height: 60px; resize: none;}
+  .controls {text-align: center; margin: 20px 0; overflow-x:auto; white-space: nowrap;}
+  .btn {padding: 8px 14px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: #fff; font-weight: 600;}
+  .btn-add {background: #27ae60;}
+  .btn-export {background: #2980b9;}
+  .btn-preview {background: #16a085;}
+  .btn-clear {background: #c0392b;}
+  .btn-backup {background: #d35400;}
+  .btn-restore {background: #2c3e50;}
+  .row-action-btn {padding:6px 10px; margin-left:6px; border-radius:4px; cursor:pointer; border:none; color:#fff;}
+  .row-add {background:#2ecc71;}
+  .row-delete {background:#e74c3c;}
+  .resolved {background: #d5efda !important; color: #155724;}
+  .pending {background: #fff3cd !important; color: #856404;}
+  .downtime {background: #f8d7da !important; color: #721c24;}
+  .summary {margin-top: 30px; padding: 15px; background: #ecf0f1; border-radius: 8px;}
+  .small {font-size: 12px;}
+  input[type="date"], input[type="datetime-local"] {padding:6px;}
+  select {min-width:130px;}
+  .cell-duration {min-width:80px;}
+  @media (max-width: 900px) {
+    table, thead, tbody, th, td, tr {display: block;}
+    th {position: sticky; top:0;}
+    td {text-align:left;}
+    .controls {overflow:auto;}
+  }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Automated Time Metric</h1>
-    <h2>Customer Service Time Metrics Tracker</h2>
 
-    <div class="controls">
-      <label class="small">Select Year:</label>
-      <select id="metricYear" onchange="updateYear()">
-        <option>2026</option><option>2027</option><option>2028</option><option>2029</option><option>2030</option>
-      </select>
+<div class="container">
+  <h1>Automated Time Metric</h1>
+  <h2>Customer Service Time Metrics Tracker</h2>
 
-      <label class="small">Date (Mondays only):</label>
-      <input type="date" id="metricDate">
+  <div class="controls">
+    <label class="small">Select Year:</label>
+    <select id="metricYear" onchange="updateYear()">
+      <option value="2026">2026</option>
+      <option value="2027">2027</option>
+      <option value="2028">2028</option>
+      <option value="2029">2029</option>
+      <option value="2030">2030</option>
+    </select>
 
-      <label class="small">Shift:</label>
-      <select id="shift">
-        <option value="">--Select Shift--</option>
-        <option value="Morning">Morning Shift</option>
-        <option value="Night">Night Shift</option>
-      </select>
+    <label class="small" style="margin-left:10px">Date (Mondays only):</label>
+    <input type="date" id="metricDate">
 
-      <label class="small">Staff:</label>
-      <select id="staff">
-        <option value="">-- Select Staff --</option>
-        <option>Abdubakar Abdullahi</option>
-        <option>Alade Adeola James</option>
-        <option>Jolaiya Adejumoke</option>
-        <option>Olabiyi Oluwafemisii</option>
-      </select>
+    <label class="small" style="margin-left:10px">Shift:</label>
+    <select id="shift">
+      <option value="">--Select Shift--</option>
+      <option value="Morning">Morning Shift</option>
+      <option value="Night">Night Shift</option>
+    </select>
 
-      <button class="btn btn-add" onclick="addRowFromTop()">Add Entry</button>
-    </div>
+    <label class="small" style="margin-left:10px">Staff:</label>
+    <select id="staff">
+      <option value="">-- Select Staff --</option>
+      <option>Abdubakar Abdullahi</option>
+      <option>Alade Adeola James</option>
+      <option>Jolaiya Adejumoke</option>
+      <option>Olabiyi Oluwafemisii</option>
+    </select>
 
-    <div class="table-wrapper">
-      <table id="metricsTable">
-        <thead>
-          <tr>
-            <th>Date</th><th>Shift</th><th>Staff</th><th>Complaint</th>
-            <th>Response Time</th><th>Resolution Time</th>
-            <th>Duration (min)</th><th>Status</th><th>Notes</th><th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-    </div>
-
-    <div class="summary">
-      <h3>Summary</h3>
-      <p>
-        Weekly Total Resolved: <span id="weeklyResolved">0</span> |
-        Weekly Pending: <span id="weeklyPending">0</span> |
-        Weekly Downtime: <span id="weeklyDowntime">0</span>
-      </p>
-      <p>Monthly Average Resolution Time: <span id="monthlyAvg">0</span> minutes</p>
-    </div>
-
-    <div class="controls">
-      <button class="btn btn-export" onclick="exportToExcel()">Export to Excel</button>
-      <button class="btn btn-preview" onclick="previewData()">Preview</button>
-      <button class="btn btn-backup" onclick="backupData()">Backup Data</button>
-      <button class="btn btn-restore" onclick="document.getElementById('restoreFile').click()">Restore Backup</button>
-      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreBackup(event)">
-      <button class="btn btn-clear" onclick="clearAllData()">Clear All Data</button>
-    </div>
+    <button class="btn btn-add" onclick="addRowFromTop()">Add Entry</button>
   </div>
 
-  <script src="assets/js/app.js"></script>
+  <div class="table-wrapper">
+    <table id="metricsTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Shift</th>
+          <th>Staff</th>
+          <th>Complaint</th>
+          <th>Response Time</th>
+          <th>Resolution Time</th>
+          <th>Duration (min)</th>
+          <th>Status</th>
+          <th>Notes</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <h3>Summary</h3>
+    <p>Weekly Total Resolved: <span id="weeklyResolved">0</span> |
+       Weekly Pending: <span id="weeklyPending">0</span> |
+       Weekly Downtime: <span id="weeklyDowntime">0</span></p>
+    <p>Monthly Average Resolution Time: <span id="monthlyAvg">0</span> minutes</p>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-export" onclick="exportToExcel()">Export to Excel</button>
+    <button class="btn btn-preview" onclick="previewData()">Preview</button>
+    <button class="btn btn-backup" onclick="backupData()">Backup Data</button>
+    <button class="btn btn-restore" onclick="document.getElementById('restoreFile').click()">Restore Backup</button>
+    <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreBackup(event)">
+    <button class="btn btn-clear" onclick="clearAllData()">Clear All Data</button>
+  </div>
+</div>
+
+<script>
+// ------------------------------ GLOBAL VARIABLES -------------------------------
+const products = [
+  "--Select complaint--",
+  "General inquiries/complaints",
+  "Auto agent",
+  "Xendify",
+  "Safe Heaven MFB",
+  "Monnify",
+  "Refund",
+  "Account restoration",
+  "Electricity",
+  "Cable Subscription",
+  "Data"
+];
+
+let selectedYear = 2026;
+let autosaveIntervalHandle = null;
+const AUTOSAVE_INTERVAL_MS = 10000;
+
+// ----------------------- YEAR & DATE HANDLING -----------------------
+function updateYear() {
+  selectedYear = parseInt(document.getElementById("metricYear").value, 10);
+  generateMondays(selectedYear);
+  loadData();
+}
+
+function generateMondays(year) {
+  const dateInput = document.getElementById("metricDate");
+  let mondays = [];
+  let d = new Date(year, 0, 1);
+  while (d.getFullYear() === year) {
+    if (d.getDay() === 1) {
+      mondays.push(new Date(d));
+      d.setDate(d.getDate() + 7);
+      break;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  while (d.getFullYear() === year) {
+    mondays.push(new Date(d));
+    d.setDate(d.getDate() + 7);
+  }
+
+  if (mondays.length > 0) {
+    dateInput.min = mondays[0].toISOString().split("T")[0];
+    dateInput.max = mondays[mondays.length - 1].toISOString().split("T")[0];
+  } else {
+    dateInput.removeAttribute("min");
+    dateInput.removeAttribute("max");
+  }
+
+  dateInput.oninput = function () {
+    if (!this.value) return;
+    const s = new Date(this.value + "T00:00:00");
+    if (s.getDay() !== 1) {
+      alert("Please select a Monday only!");
+      this.value = "";
+    }
+  };
+}
+
+// ---------------------------- ROW CREATION & LISTENERS -----------------------------
+function createRowElement(item = null) {
+  const row = document.createElement("tr");
+  const dateVal = item?.date || "";
+  const shiftVal = item?.shift || "";
+  const staffVal = item?.staff || "";
+  const productVal = item?.product || products[0];
+  const responseVal = item?.response || "";
+  const resolutionVal = item?.resolution || "";
+  const durationVal = item?.duration || "0";
+  const statusVal = item?.status || "Select Status";
+  const notesVal = item?.notes || "";
+
+  row.innerHTML = `
+    <td class="cell-date"><input type="date" class="row-date" value="${escapeHtml(dateVal)}"></td>
+    <td class="cell-shift">
+      <select class="row-shift">
+        <option value="">--Select Shift--</option>
+        <option value="Morning"${shiftVal === "Morning" ? " selected" : ""}>Morning Shift</option>
+        <option value="Night"${shiftVal === "Night" ? " selected" : ""}>Night Shift</option>
+      </select>
+    </td>
+    <td class="cell-staff">
+      <select class="row-staff">
+        <option value="">-- Select Staff --</option>
+        <option${staffVal === "Abdubakar Abdullahi" ? " selected" : ""}>Abdubakar Abdullahi</option>
+        <option${staffVal === "Alade Adeola James" ? " selected" : ""}>Alade Adeola James</option>
+        <option${staffVal === "Jolaiya Adejumoke" ? " selected" : ""}>Jolaiya Adejumoke</option>
+        <option${staffVal === "Olabiyi Oluwafemisii" ? " selected" : ""}>Olabiyi Oluwafemisii</option>
+      </select>
+    </td>
+    <td class="cell-product">
+      <select class="product-select">${products.map(p => `<option value="${escapeHtml(p)}"${p === productVal ? " selected" : ""}>${escapeHtml(p)}</option>`).join("")}</select>
+    </td>
+    <td class="cell-response"><input type="datetime-local" class="response-input" value="${escapeHtml(responseVal)}"></td>
+    <td class="cell-resolution"><input type="datetime-local" class="resolution-input" value="${escapeHtml(resolutionVal)}"></td>
+    <td class="cell-duration">${escapeHtml(durationVal)}</td>
+    <td class="cell-status">
+      <select class="status-select">
+        <option${statusVal === "Select Status" ? " selected" : ""}>Select Status</option>
+        <option${statusVal === "Pending" ? " selected" : ""}>Pending</option>
+        <option${statusVal === "Resolved" ? " selected" : ""}>Resolved</option>
+        <option${statusVal === "Downtime" ? " selected" : ""}>Downtime</option>
+      </select>
+    </td>
+    <td class="cell-notes"><textarea class="notes-textarea" placeholder="Add notes...">${escapeHtml(notesVal)}</textarea></td>
+    <td class="cell-action">
+      <button class="row-action-btn row-add" title="Add row below">Add</button>
+      <button class="row-action-btn row-delete" title="Delete row">Delete</button>
+    </td>
+  `;
+
+  const dateInput = row.querySelector(".row-date");
+  const shiftSelect = row.querySelector(".row-shift");
+  const staffSelect = row.querySelector(".row-staff");
+  const productSelect = row.querySelector(".product-select");
+  const responseInput = row.querySelector(".response-input");
+  const resolutionInput = row.querySelector(".resolution-input");
+  const durationCell = row.querySelector(".cell-duration");
+  const statusSelect = row.querySelector(".status-select");
+  const notesTextarea = row.querySelector(".notes-textarea");
+  const addBtn = row.querySelector(".row-add");
+  const deleteBtn = row.querySelector(".row-delete");
+
+  dateInput.addEventListener("change", function () {
+    if (!this.value) { saveData(); updateSummary(); return; }
+    const dt = new Date(this.value + "T00:00:00");
+    if (dt.getDay() !== 1) { alert("Please select a Monday only!"); this.value = ""; }
+    saveData(); updateSummary();
+  });
+
+  [shiftSelect, staffSelect, productSelect].forEach(el => el.addEventListener("change", () => { saveData(); updateSummary(); }));
+  responseInput.addEventListener("change", () => { calculateDurationForRow(row); saveData(); updateSummary(); });
+  resolutionInput.addEventListener("change", () => { calculateDurationForRow(row); saveData(); updateSummary(); });
+  statusSelect.addEventListener("change", () => { applyStatusClassToRow(row, statusSelect.value); saveData(); updateSummary(); });
+  notesTextarea.addEventListener("input", () => { saveData(); });
+
+  deleteBtn.addEventListener("click", () => { if (confirm("Delete this row?")) { row.remove(); saveData(); updateSummary(); } });
+  addBtn.addEventListener("click", () => { const newRow = createRowElement(null); row.parentNode.insertBefore(newRow, row.nextSibling); const firstInput = newRow.querySelector(".row-date") || newRow.querySelector(".row-shift"); if(firstInput) firstInput.focus(); saveData(); updateSummary(); });
+
+  applyStatusClassToRow(row, statusVal);
+  if(responseInput.value || resolutionInput.value) calculateDurationForRow(row);
+  return row;
+}
+
+// -------------------------- ADD ROW FROM TOP --------------------------
+function addRowFromTop() {
+  const date = document.getElementById("metricDate").value;
+  const shift = document.getElementById("shift").value;
+  const staff = document.getElementById("staff").value;
+  const item = (date || shift || staff) ? { date, shift, staff, product: products[0], response:"", resolution:"", duration:"0", status:"Select Status", notes:""} : null;
+  const tbody = document.getElementById("tableBody");
+  const row = createRowElement(item);
+  tbody.appendChild(row);
+  const firstInput = row.querySelector(".row-date") || row.querySelector(".row-shift");
+  if (firstInput) firstInput.focus();
+  saveData(); updateSummary();
+}
+
+// -------------------------- DURATION & STATUS --------------------------
+function calculateDurationForRow(row) {
+  const resp = row.querySelector(".response-input")?.value;
+  const reso = row.querySelector(".resolution-input")?.value;
+  const durationCell = row.querySelector(".cell-duration");
+  if(resp && reso) { const diff = Math.round((new Date(reso)-new Date(resp))/60000); durationCell.textContent = diff>0?diff:0; } else { durationCell.textContent = "0"; }
+}
+function applyStatusClassToRow(row, value) {
+  row.classList.remove("pending","resolved","downtime");
+  if(value==="Pending") row.classList.add("pending");
+  if(value==="Resolved") row.classList.add("resolved");
+  if(value==="Downtime") row.classList.add("downtime");
+}
+
+// -------------------------- SUMMARY --------------------------
+function updateSummary() {
+  const rows = document.querySelectorAll("#tableBody tr");
+  let resolved=0,pending=0,downtime=0,totalTime=0,count=0;
+  rows.forEach(row=>{
+    const status=row.querySelector(".status-select").value;
+    const dur=parseInt(row.querySelector(".cell-duration").textContent)||0;
+    if(status==="Resolved"){ resolved++; if(dur>0){totalTime+=dur; count++;} } else if(status==="Pending"){ pending++; } else if(status==="Downtime"){ downtime++; }
+  });
+  document.getElementById("weeklyResolved").textContent=resolved;
+  document.getElementById("weeklyPending").textContent=pending;
+  document.getElementById("weeklyDowntime").textContent=downtime;
+  document.getElementById("monthlyAvg").textContent=count>0?Math.round(totalTime/count):0;
+}
+
+// -------------------------- SAVE/LOAD --------------------------
+function storageKeyForYear(year){ return "automatedMetrics"+year; }
+function saveData() {
+  const data=[];
+  document.querySelectorAll("#tableBody tr").forEach(row=>{
+    data.push({
+      date: row.querySelector(".row-date")?.value||"",
+      shift: row.querySelector(".row-shift")?.value||"",
+      staff: row.querySelector(".row-staff")?.value||"",
+      product: row.querySelector(".product-select")?.value||"",
+      response: row.querySelector(".response-input")?.value||"",
+      resolution: row.querySelector(".resolution-input")?.value||"",
+      duration: row.querySelector(".cell-duration")?.textContent||"0",
+      status: row.querySelector(".status-select")?.value||"",
+      notes: row.querySelector(".notes-textarea")?.value||""
+    });
+  });
+  localStorage.setItem(storageKeyForYear(selectedYear), JSON.stringify(data));
+}
+function loadData() {
+  const tbody=document.getElementById("tableBody"); tbody.innerHTML="";
+  const saved=localStorage.getItem(storageKeyForYear(selectedYear));
+  if(saved){ try{ const data=JSON.parse(saved); data.forEach(item=>tbody.appendChild(createRowElement(item))); }catch(e){console.error(e);} }
+  updateSummary();
+}
+
+// -------------------------- BACKUP/RESTORE --------------------------
+function backupData() {
+  const allYears={}; for(let y=2026;y<=2030;y++){ allYears[y]=JSON.parse(localStorage.getItem(storageKeyForYear(y))||"[]"); }
+  const blob=new Blob([JSON.stringify(allYears,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="automated_Metrics_Backup.json"; document.body.appendChild(a); a.click(); a.remove();
+}
+function restoreBackup(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(evt){
+    try{ const data=JSON.parse(evt.target.result); for(let y=2026;y<=2030;y++){ localStorage.setItem(storageKeyForYear(y), JSON.stringify(data[y]||[])); } alert("Backup restored successfully!"); loadData(); } catch(err){ alert("Invalid backup file."); console.error(err); } finally{ e.target.value=""; }
+  }; reader.readAsText(file);
+}
+function clearAllData(){ if(confirm("Delete ALL data for year "+selectedYear+"?")){ localStorage.removeItem(storageKeyForYear(selectedYear)); document.getElementById("tableBody").innerHTML=""; updateSummary(); }}
+
+// -------------------------- EXPORT/PREVIEW --------------------------
+function escapeHtml(text){ return text?String(text).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):""; }
+function previewData(){
+  const preview=window.open("","_blank"); let html=`<html><head><title>Preview</title><style>body{font-family:Arial;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #aaa;padding:8px;text-align:center;}th{background:#3498db;color:white;}</style></head><body><h2>Automated Time Metrics (Print Preview)</h2><table><thead><tr><th>Date</th><th>Shift</th><th>Staff</th><th>Product</th><th>Response</th><th>Resolution</th><th>Duration</th><th>Status</th><th>Notes</th></tr></thead><tbody>`;
+  document.querySelectorAll("#tableBody tr").forEach(row=>{
+    html+=`<tr><td>${escapeHtml(row.querySelector(".row-date")?.value)}</td><td>${escapeHtml(row.querySelector(".row-shift")?.value)}</td><td>${escapeHtml(row.querySelector(".row-staff")?.value)}</td><td>${escapeHtml(row.querySelector(".product-select")?.value)}</td><td>${escapeHtml(row.querySelector(".response-input")?.value)}</td><td>${escapeHtml(row.querySelector(".resolution-input")?.value)}</td><td>${escapeHtml(row.querySelector(".cell-duration")?.textContent)}</td><td>${escapeHtml(row.querySelector(".status-select")?.value)}</td><td>${escapeHtml(row.querySelector(".notes-textarea")?.value)}</td></tr>`;
+  });
+  html+="</tbody></table></body></html>"; preview.document.write(html); preview.document.close();
+}
+function exportToExcel(){
+  const rows=[["Date","Shift","Staff","Product","Response","Resolution","Duration (min)","Status","Notes"]];
+  document.querySelectorAll("#tableBody tr").forEach(row=>rows.push([
+    row.querySelector(".row-date")?.value,
+    row.querySelector(".row-shift")?.value,
+    row.querySelector(".row-staff")?.value,
+    row.querySelector(".product-select")?.value,
+    row.querySelector(".response-input")?.value,
+    row.querySelector(".resolution-input")?.value,
+    row.querySelector(".cell-duration")?.textContent,
+    row.querySelector(".status-select")?.value,
+    row.querySelector(".notes-textarea")?.value
+  ]));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Metrics");
+  XLSX.writeFile(wb, `automated_metrics_${selectedYear}.xlsx`);
+}
+
+// -------------------------- AUTOSAVE --------------------------
+function startAutosave(){
+  if(autosaveIntervalHandle) clearInterval(autosaveIntervalHandle);
+  autosaveIntervalHandle=setInterval(saveData,AUTOSAVE_INTERVAL_MS);
+  window.removeEventListener("beforeunload", onBeforeUnloadSave);
+  window.addEventListener("beforeunload", onBeforeUnloadSave);
+}
+function onBeforeUnloadSave(){ saveData(); }
+
+// -------------------------- INIT --------------------------
+document.getElementById("metricYear").value=String(selectedYear);
+generateMondays(selectedYear); loadData(); startAutosave();
+document.addEventListener("focusout",(e)=>{ if(e.target?.matches(".row-date,.row-shift,.row-staff,.product-select,.response-input,.resolution-input,.status-select,.notes-textarea")){ const r=e.target.closest("tr"); if(r) calculateDurationForRow(r); saveData(); updateSummary(); }});
+</script>
+
 </body>
 </html>
