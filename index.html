@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   body {font-family: Arial, sans-serif; margin: 20px; background: #f4f6f9;}
   h1, h2 {text-align: center; color: #2c3e50;}
@@ -24,6 +25,8 @@
   .btn-clear {background: #c0392b;}
   .btn-backup {background: #d35400;}
   .btn-restore {background: #2c3e50;}
+  .btn-summary {background: #8e44ad;}
+  .btn-toggle-summary {background: #9b59b6;}
   .row-action-btn {padding:6px 10px; margin-left:6px; border-radius:4px; cursor:pointer; border:none; color:#fff;}
   .row-add {background:#2ecc71;}
   .row-delete {background:#e74c3c;}
@@ -31,15 +34,21 @@
   .pending {background: #fff3cd !important; color: #856404;}
   .downtime {background: #f8d7da !important; color: #721c24;}
   .summary {margin-top: 30px; padding: 15px; background: #ecf0f1; border-radius: 8px;}
+  .summary-section {margin-bottom: 25px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);}
+  .summary-title {font-weight: bold; font-size: 1.3em; margin-bottom: 10px; color: #2c3e50;}
+  .chart-container {position: relative; height: 300px; margin-top: 15px;}
+  .staff-table {width: 100%; margin-top: 10px; border-collapse: collapse;}
+  .staff-table th {background: #34495e; color: white;}
+  .staff-table td {background: #f9f9f9;}
   .small {font-size: 12px;}
   input[type="date"], input[type="datetime-local"] {padding:6px;}
   select {min-width:130px;}
   .cell-duration {min-width:80px;}
+  #monthSelectorContainer, #quarterSelectorContainer {display: none; margin-left: 15px;}
   @media (max-width: 900px) {
-    table, thead, tbody, th, td, tr {display: block;}
-    th {position: sticky; top:0;}
-    td {text-align:left;}
-    .controls {overflow:auto;}
+    .staff-table, .staff-table thead, .staff-table tbody, .staff-table th, .staff-table td, .staff-table tr {display: block;}
+    .staff-table th, .staff-table td {text-align: left;}
+    .chart-container {height: 250px;}
   }
 </style>
 </head>
@@ -47,7 +56,8 @@
 <div class="container">
   <h1>Automated Time Metric</h1>
   <h2>Customer Service Time Metrics Tracker</h2>
-  <div class="controls">
+
+  <div class="controls period-controls">
     <label class="small">Select Year:</label>
     <select id="metricYear" onchange="updateYear()">
       <option value="2026">2026</option>
@@ -57,7 +67,18 @@
       <option value="2030">2030</option>
     </select>
     <label class="small" style="margin-left:10px">Date (Mondays only):</label>
-    <input type="date" id="metricDate">
+    <input type="date" id="metricDate" onchange="onDateSelected()">
+    <span id="monthSelectorContainer">
+      <label class="small">Monthly:</label>
+      <select id="monthSelector" onchange="updateMonthlySummary()"></select>
+    </span>
+    <span id="quarterSelectorContainer">
+      <label class="small">Quarterly:</label>
+      <select id="quarterSelector" onchange="updateQuarterlySummary()"></select>
+    </span>
+  </div>
+
+  <div class="controls entry-controls">
     <label class="small" style="margin-left:10px">Shift:</label>
     <select id="shift">
       <option value="">--Select Shift--</option>
@@ -73,7 +94,9 @@
       <option>Olabiyi Oluwafemisii</option>
     </select>
     <button class="btn btn-add" onclick="addRowFromTop()">Add Entry</button>
+    <button class="btn btn-toggle-summary" id="toggleSummaryBtn" onclick="toggleSummary()">Show Summary</button>
   </div>
+
   <div class="table-wrapper">
     <table id="metricsTable">
       <thead>
@@ -93,15 +116,79 @@
       <tbody id="tableBody"></tbody>
     </table>
   </div>
-  <div class="summary">
-    <h3>Summary</h3>
-    <p>Weekly Total Resolved: <span id="weeklyResolved">0</span> |
-       Weekly Pending: <span id="weeklyPending">0</span> |
-       Weekly Downtime: <span id="weeklyDowntime">0</span></p>
-    <p>Average Handling Time per Chat: <span id="avgHandlingTime">0</span> minutes</p>
-    <p>Complaint Resolution Rate: <span id="resolutionRate">0</span>%</p>
-    <p>Monthly Average Resolution Time: <span id="monthlyAvg">0</span> minutes</p>
+
+  <div class="summary" id="summarySection" style="display: none;">
+    <div class="summary-section">
+      <div class="summary-title">Yearly Summary <span id="yearlyPeriod"></span></div>
+      <p>Resolved: <span id="yearlyResolved">0</span> |
+         Pending: <span id="yearlyPending">0</span> |
+         Downtime: <span id="yearlyDowntime">0</span></p>
+      <p>Average Handling Time: <span id="yearlyAvgHandling">0</span> minutes</p>
+      <p>Resolution Rate: <span id="yearlyResolutionRate">0</span>%</p>
+      <div class="chart-container">
+        <canvas id="yearlyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-title">Weekly Summary <span id="weeklyPeriod"></span></div>
+      <p>Resolved: <span id="weeklyResolved">0</span> |
+         Pending: <span id="weeklyPending">0</span> |
+         Downtime: <span id="weeklyDowntime">0</span></p>
+      <p>Average Handling Time: <span id="weeklyAvgHandling">0</span> minutes</p>
+      <p>Resolution Rate: <span id="weeklyResolutionRate">0</span>%</p>
+      <div class="chart-container">
+        <canvas id="weeklyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-title">Monthly Summary <span id="monthlyPeriod"></span></div>
+      <p>Resolved: <span id="monthlyResolved">0</span> |
+         Pending: <span id="monthlyPending">0</span> |
+         Downtime: <span id="monthlyDowntime">0</span></p>
+      <p>Average Handling Time: <span id="monthlyAvgHandling">0</span> minutes</p>
+      <p>Resolution Rate: <span id="monthlyResolutionRate">0</span>%</p>
+      <div class="chart-container">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-title">Quarterly Summary <span id="quarterlyPeriod"></span></div>
+      <p>Resolved: <span id="quarterlyResolved">0</span> |
+         Pending: <span id="quarterlyPending">0</span> |
+         Downtime: <span id="quarterlyDowntime">0</span></p>
+      <p>Average Handling Time: <span id="quarterlyAvgHandling">0</span> minutes</p>
+      <p>Resolution Rate: <span id="quarterlyResolutionRate">0</span>%</p>
+      <div class="chart-container">
+        <canvas id="quarterlyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-title">Staff Performance Breakdown <span id="staffPeriod"></span></div>
+      <div class="table-wrapper">
+        <table class="staff-table" id="staffTable">
+          <thead>
+            <tr>
+              <th>Staff</th>
+              <th>Resolved</th>
+              <th>Pending</th>
+              <th>Downtime</th>
+              <th>Avg Handling Time (min)</th>
+              <th>Resolution Rate (%)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="chart-container">
+        <canvas id="staffChart"></canvas>
+      </div>
+    </div>
   </div>
+
   <div class="controls">
     <button class="btn btn-export" onclick="exportToExcel()">Export to Excel</button>
     <button class="btn btn-preview" onclick="previewData()">Preview</button>
@@ -111,8 +198,9 @@
     <button class="btn btn-clear" onclick="clearAllData()">Clear All Data</button>
   </div>
 </div>
+
 <script>
-// ------------------------------ GLOBAL VARIABLES -------------------------------
+// Global variables
 const products = [
   "--Select complaint--",
   "General inquiries/complaints",
@@ -126,27 +214,33 @@ const products = [
   "Cable Subscription",
   "Data"
 ];
+const staffList = [
+  "Abdubakar Abdullahi",
+  "Alade Adeola James",
+  "Jolaiya Adejumoke",
+  "Olabiyi Oluwafemisii"
+];
 let selectedYear = 2026;
+let currentSelectedDate = null;
+let currentMonth = null;
+let currentQuarter = null;
 let autosaveIntervalHandle = null;
 const AUTOSAVE_INTERVAL_MS = 10000;
-// ----------------------- YEAR & DATE HANDLING -----------------------
+
+let yearlyChart = null, weeklyChart = null, monthlyChart = null, quarterlyChart = null, staffChart = null;
+
 function updateYear() {
   selectedYear = parseInt(document.getElementById("metricYear").value, 10);
   generateMondays(selectedYear);
   loadData();
+  updateSummary();
 }
+
 function generateMondays(year) {
   const dateInput = document.getElementById("metricDate");
   let mondays = [];
   let d = new Date(year, 0, 1);
-  while (d.getFullYear() === year) {
-    if (d.getDay() === 1) {
-      mondays.push(new Date(d));
-      d.setDate(d.getDate() + 7);
-      break;
-    }
-    d.setDate(d.getDate() + 1);
-  }
+  while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
   while (d.getFullYear() === year) {
     mondays.push(new Date(d));
     d.setDate(d.getDate() + 7);
@@ -154,9 +248,6 @@ function generateMondays(year) {
   if (mondays.length > 0) {
     dateInput.min = mondays[0].toISOString().split("T")[0];
     dateInput.max = mondays[mondays.length - 1].toISOString().split("T")[0];
-  } else {
-    dateInput.removeAttribute("min");
-    dateInput.removeAttribute("max");
   }
   dateInput.oninput = function () {
     if (!this.value) return;
@@ -167,7 +258,93 @@ function generateMondays(year) {
     }
   };
 }
-// ---------------------------- ROW CREATION & LISTENERS -----------------------------
+
+function getQuarterFromDate(date) {
+  const month = date.getMonth();
+  const q = Math.floor(month / 3) + 1;
+  return `${date.getFullYear()}-Q${q}`;
+}
+
+function onDateSelected() {
+  const dateStr = document.getElementById("metricDate").value;
+  if (!dateStr) {
+    document.getElementById("monthSelectorContainer").style.display = "none";
+    document.getElementById("quarterSelectorContainer").style.display = "none";
+    currentSelectedDate = null;
+    currentMonth = null;
+    currentQuarter = null;
+    updateSummary();
+    return;
+  }
+  currentSelectedDate = new Date(dateStr);
+  const year = currentSelectedDate.getFullYear();
+  const month = currentSelectedDate.getMonth();
+  currentMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+  currentQuarter = getQuarterFromDate(currentSelectedDate);
+
+  // Month selector
+  const monthSelect = document.getElementById("monthSelector");
+  monthSelect.innerHTML = "";
+  const tempDate = new Date(year, 0, 1);
+  for (let m = 0; m < 12; m++) {
+    tempDate.setMonth(m);
+    const opt = document.createElement("option");
+    opt.value = `${year}-${String(m + 1).padStart(2, '0')}`;
+    opt.textContent = tempDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    if (m === month) opt.selected = true;
+    monthSelect.appendChild(opt);
+  }
+  document.getElementById("monthSelectorContainer").style.display = "inline";
+
+  // Quarter selector
+  const quarterSelect = document.getElementById("quarterSelector");
+  quarterSelect.innerHTML = "";
+  for (let q = 1; q <= 4; q++) {
+    const opt = document.createElement("option");
+    opt.value = `${year}-Q${q}`;
+    opt.textContent = `Q${q} ${year}`;
+    if (q === Math.floor(month / 3) + 1) opt.selected = true;
+    quarterSelect.appendChild(opt);
+  }
+  document.getElementById("quarterSelectorContainer").style.display = "inline";
+
+  updateSummary();
+}
+
+function updateMonthlySummary() {
+  const val = document.getElementById("monthSelector").value;
+  if (val) {
+    currentMonth = val;
+    const [y, m] = val.split('-');
+    const sampleDate = new Date(y, m - 1, 1);
+    currentQuarter = getQuarterFromDate(sampleDate);
+    document.getElementById("quarterSelector").value = currentQuarter;
+    updateSummary();
+  }
+}
+
+function updateQuarterlySummary() {
+  const val = document.getElementById("quarterSelector").value;
+  if (val) {
+    currentQuarter = val;
+    updateSummary();
+  }
+}
+
+function toggleSummary() {
+  const summarySection = document.getElementById("summarySection");
+  const btn = document.getElementById("toggleSummaryBtn");
+  if (summarySection.style.display === "none" || summarySection.style.display === "") {
+    summarySection.style.display = "block";
+    btn.textContent = "Hide Summary";
+    updateSummary(); // Refresh charts when shown
+  } else {
+    summarySection.style.display = "none";
+    btn.textContent = "Show Summary";
+  }
+}
+
+// Row creation
 function createRowElement(item = null) {
   const row = document.createElement("tr");
   const dateVal = item?.date || "";
@@ -179,6 +356,7 @@ function createRowElement(item = null) {
   const durationVal = item?.duration || "0";
   const statusVal = item?.status || "Select Status";
   const notesVal = item?.notes || "";
+
   row.innerHTML = `
     <td class="cell-date"><input type="date" class="row-date" value="${escapeHtml(dateVal)}"></td>
     <td class="cell-shift">
@@ -191,10 +369,7 @@ function createRowElement(item = null) {
     <td class="cell-staff">
       <select class="row-staff">
         <option value="">-- Select Staff --</option>
-        <option${staffVal === "Abdubakar Abdullahi" ? " selected" : ""}>Abdubakar Abdullahi</option>
-        <option${staffVal === "Alade Adeola James" ? " selected" : ""}>Alade Adeola James</option>
-        <option${staffVal === "Jolaiya Adejumoke" ? " selected" : ""}>Jolaiya Adejumoke</option>
-        <option${staffVal === "Olabiyi Oluwafemisii" ? " selected" : ""}>Olabiyi Oluwafemisii</option>
+        ${staffList.map(s => `<option${staffVal === s ? " selected" : ""}>${s}</option>`).join("")}
       </select>
     </td>
     <td class="cell-product">
@@ -217,21 +392,23 @@ function createRowElement(item = null) {
       <button class="row-action-btn row-delete" title="Delete row">Delete</button>
     </td>
   `;
+
   const dateInput = row.querySelector(".row-date");
   const shiftSelect = row.querySelector(".row-shift");
   const staffSelect = row.querySelector(".row-staff");
   const productSelect = row.querySelector(".product-select");
   const responseInput = row.querySelector(".response-input");
   const resolutionInput = row.querySelector(".resolution-input");
-  const durationCell = row.querySelector(".cell-duration");
   const statusSelect = row.querySelector(".status-select");
   const notesTextarea = row.querySelector(".notes-textarea");
   const addBtn = row.querySelector(".row-add");
   const deleteBtn = row.querySelector(".row-delete");
-  dateInput.addEventListener("change", function () {
-    if (!this.value) { saveData(); updateSummary(); return; }
-    const dt = new Date(this.value + "T00:00:00");
-    if (dt.getDay() !== 1) { alert("Please select a Monday only!"); this.value = ""; }
+
+  dateInput.addEventListener("change", () => {
+    if (dateInput.value) {
+      const dt = new Date(dateInput.value);
+      if (dt.getDay() !== 1) { alert("Please select a Monday only!"); dateInput.value = ""; }
+    }
     saveData(); updateSummary();
   });
   [shiftSelect, staffSelect, productSelect].forEach(el => el.addEventListener("change", () => { saveData(); updateSummary(); }));
@@ -240,162 +417,342 @@ function createRowElement(item = null) {
   statusSelect.addEventListener("change", () => { applyStatusClassToRow(row, statusSelect.value); saveData(); updateSummary(); });
   notesTextarea.addEventListener("input", () => { saveData(); });
   deleteBtn.addEventListener("click", () => { if (confirm("Delete this row?")) { row.remove(); saveData(); updateSummary(); } });
-  addBtn.addEventListener("click", () => { const newRow = createRowElement(null); row.parentNode.insertBefore(newRow, row.nextSibling); const firstInput = newRow.querySelector(".row-date") || newRow.querySelector(".row-shift"); if(firstInput) firstInput.focus(); saveData(); updateSummary(); });
+  addBtn.addEventListener("click", () => {
+    const newRow = createRowElement(null);
+    row.parentNode.insertBefore(newRow, row.nextSibling);
+    const firstInput = newRow.querySelector(".row-date") || newRow.querySelector(".row-shift");
+    if (firstInput) firstInput.focus();
+    saveData(); updateSummary();
+  });
+
   applyStatusClassToRow(row, statusVal);
-  if(responseInput.value || resolutionInput.value) calculateDurationForRow(row);
+  if (responseInput.value && resolutionInput.value) calculateDurationForRow(row);
   return row;
 }
-// -------------------------- ADD ROW FROM TOP --------------------------
+
 function addRowFromTop() {
   const date = document.getElementById("metricDate").value;
   const shift = document.getElementById("shift").value;
   const staff = document.getElementById("staff").value;
-  const item = (date || shift || staff) ? { date, shift, staff, product: products[0], response:"", resolution:"", duration:"0", status:"Select Status", notes:""} : null;
+  const item = (date || shift || staff) ? { date, shift, staff, product: products[0], response: "", resolution: "", duration: "0", status: "Select Status", notes: "" } : null;
   const tbody = document.getElementById("tableBody");
   const row = createRowElement(item);
   tbody.appendChild(row);
   const firstInput = row.querySelector(".row-date") || row.querySelector(".row-shift");
   if (firstInput) firstInput.focus();
-  saveData(); updateSummary();
+  saveData();
+  updateSummary();
 }
-// -------------------------- DURATION & STATUS --------------------------
+
 function calculateDurationForRow(row) {
   const resp = row.querySelector(".response-input")?.value;
   const reso = row.querySelector(".resolution-input")?.value;
   const durationCell = row.querySelector(".cell-duration");
-  if(resp && reso) { 
-    const diff = Math.round((new Date(reso)-new Date(resp))/60000); 
-    durationCell.textContent = diff>0?diff:0; 
-  } else { 
-    durationCell.textContent = "0"; 
+  if (resp && reso) {
+    const diff = Math.round((new Date(reso) - new Date(resp)) / 60000);
+    durationCell.textContent = diff > 0 ? diff : 0;
+  } else {
+    durationCell.textContent = "0";
   }
 }
+
 function applyStatusClassToRow(row, value) {
-  row.classList.remove("pending","resolved","downtime");
-  if(value==="Pending") row.classList.add("pending");
-  if(value==="Resolved") row.classList.add("resolved");
-  if(value==="Downtime") row.classList.add("downtime");
+  row.classList.remove("pending", "resolved", "downtime");
+  if (value === "Pending") row.classList.add("pending");
+  if (value === "Resolved") row.classList.add("resolved");
+  if (value === "Downtime") row.classList.add("downtime");
 }
-// -------------------------- SUMMARY --------------------------
+
+// Summary & Charts
 function updateSummary() {
-  const rows = document.querySelectorAll("#tableBody tr");
-  let resolved = 0, pending = 0, downtime = 0;
-  let totalTime = 0, resolvedCount = 0;
-  let totalComplaints = 0; // excludes Downtime
+  const rows = Array.from(document.querySelectorAll("#tableBody tr"));
+
+  function isInWeek(rowDateStr, weekMonday) {
+    if (!rowDateStr || !weekMonday) return false;
+    const rowDate = new Date(rowDateStr);
+    const rowMonday = new Date(rowDate);
+    rowMonday.setDate(rowDate.getDate() - rowDate.getDay() + 1);
+    return rowMonday.toISOString().split('T')[0] === weekMonday.toISOString().split('T')[0];
+  }
+
+  function isInMonth(rowDateStr, monthStr) {
+    if (!rowDateStr || !monthStr) return false;
+    const rowDate = new Date(rowDateStr);
+    const ym = `${rowDate.getFullYear()}-${String(rowDate.getMonth() + 1).padStart(2, '0')}`;
+    return ym === monthStr;
+  }
+
+  function isInQuarter(rowDateStr, quarterStr) {
+    if (!rowDateStr || !quarterStr) return false;
+    const rowDate = new Date(rowDateStr);
+    const q = Math.floor(rowDate.getMonth() / 3) + 1;
+    return `${rowDate.getFullYear()}-Q${q}` === quarterStr;
+  }
+
+  const yearlyStats = {resolved:0, pending:0, downtime:0, totalTime:0, resolvedCount:0, totalComplaints:0};
+  const weekStats = {resolved:0, pending:0, downtime:0, totalTime:0, resolvedCount:0, totalComplaints:0};
+  const monthStats = {resolved:0, pending:0, downtime:0, totalTime:0, resolvedCount:0, totalComplaints:0};
+  const quarterStats = {resolved:0, pending:0, downtime:0, totalTime:0, resolvedCount:0, totalComplaints:0};
+  const staffStatsMap = {};
+  staffList.forEach(name => staffStatsMap[name] = {resolved:0, pending:0, downtime:0, totalTime:0, resolvedCount:0, totalComplaints:0});
+
+  const weekMondayStr = currentSelectedDate ? currentSelectedDate.toISOString().split('T')[0] : null;
 
   rows.forEach(row => {
-    const status = row.querySelector(".status-select").value;
-    const dur = parseInt(row.querySelector(".cell-duration").textContent) || 0;
+    const dateVal = row.querySelector(".row-date")?.value;
+    if (!dateVal) return;
+    const staffName = row.querySelector(".row-staff")?.value || "";
+    const status = row.querySelector(".status-select")?.value || "";
+    const dur = parseInt(row.querySelector(".cell-duration")?.textContent || "0", 10);
 
-    if (status === "Resolved") {
-      resolved++;
-      if (dur > 0) {
-        totalTime += dur;
-        resolvedCount++;
-      }
-      totalComplaints++;
-    } else if (status === "Pending") {
-      pending++;
-      totalComplaints++;
-    } else if (status === "Downtime") {
-      downtime++;
-    }
+    updateStats(yearlyStats, status, dur);
+    if (weekMondayStr && isInWeek(dateVal, currentSelectedDate)) updateStats(weekStats, status, dur);
+    if (currentMonth && isInMonth(dateVal, currentMonth)) updateStats(monthStats, status, dur);
+    if (currentQuarter && isInQuarter(dateVal, currentQuarter)) updateStats(quarterStats, status, dur);
+    if (currentMonth && isInMonth(dateVal, currentMonth) && staffName) updateStats(staffStatsMap[staffName], status, dur);
   });
 
-  // Update counts
-  document.getElementById("weeklyResolved").textContent = resolved;
-  document.getElementById("weeklyPending").textContent = pending;
-  document.getElementById("weeklyDowntime").textContent = downtime;
+  function updateStats(stats, status, dur) {
+    if (status === "Resolved") {
+      stats.resolved++;
+      if (dur > 0) { stats.totalTime += dur; stats.resolvedCount++; }
+      stats.totalComplaints++;
+    } else if (status === "Pending") {
+      stats.pending++;
+      stats.totalComplaints++;
+    } else if (status === "Downtime") {
+      stats.downtime++;
+    }
+  }
 
-  // Average Handling Time per Chat (for Resolved)
-  const avgHandling = resolvedCount > 0 ? Math.round(totalTime / resolvedCount) : 0;
-  document.getElementById("avgHandlingTime").textContent = avgHandling;
+  function renderStats(stats, prefix) {
+    document.getElementById(prefix + "Resolved").textContent = stats.resolved;
+    document.getElementById(prefix + "Pending").textContent = stats.pending;
+    document.getElementById(prefix + "Downtime").textContent = stats.downtime;
+    const avg = stats.resolvedCount > 0 ? Math.round(stats.totalTime / stats.resolvedCount) : 0;
+    document.getElementById(prefix + "AvgHandling").textContent = avg;
+    const rate = stats.totalComplaints > 0 ? Math.round((stats.resolved / stats.totalComplaints) * 100) : 0;
+    document.getElementById(prefix + "ResolutionRate").textContent = rate;
+    return {resolved: stats.resolved, pending: stats.pending, downtime: stats.downtime};
+  }
 
-  // Complaint Resolution Rate (%)
-  const resolutionRate = totalComplaints > 0 ? Math.round((resolved / totalComplaints) * 100) : 0;
-  document.getElementById("resolutionRate").textContent = resolutionRate;
+  // Render all summaries
+  renderStats(yearlyStats, "yearly"); document.getElementById("yearlyPeriod").textContent = `(${selectedYear})`;
+  renderStats(weekStats, "weekly"); document.getElementById("weeklyPeriod").textContent = weekMondayStr ? `(Week of ${weekMondayStr})` : "(No week selected)";
+  renderStats(monthStats, "monthly"); const monthDisplay = currentMonth ? new Date(currentMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' }) : "N/A"; document.getElementById("monthlyPeriod").textContent = `(${monthDisplay})`;
+  renderStats(quarterStats, "quarterly"); document.getElementById("quarterlyPeriod").textContent = currentQuarter ? `(${currentQuarter.replace('-', ' ')})` : "(N/A)";
 
-  // Existing Monthly Average (kept for backward compatibility)
-  document.getElementById("monthlyAvg").textContent = resolvedCount > 0 ? Math.round(totalTime / resolvedCount) : 0;
+  // Charts
+  if (yearlyChart) yearlyChart.destroy();
+  yearlyChart = createPieChart(document.getElementById("yearlyChart"), yearlyStats.resolved, yearlyStats.pending, yearlyStats.downtime, `Year ${selectedYear}`);
+
+  if (weeklyChart) weeklyChart.destroy();
+  weeklyChart = createPieChart(document.getElementById("weeklyChart"), weekStats.resolved, weekStats.pending, weekStats.downtime, weekMondayStr || "Weekly");
+
+  if (monthlyChart) monthlyChart.destroy();
+  monthlyChart = createPieChart(document.getElementById("monthlyChart"), monthStats.resolved, monthStats.pending, monthStats.downtime, monthDisplay);
+
+  if (quarterlyChart) quarterlyChart.destroy();
+  quarterlyChart = createPieChart(document.getElementById("quarterlyChart"), quarterStats.resolved, quarterStats.pending, quarterStats.downtime, currentQuarter || "Quarterly");
+
+  // Staff
+  document.getElementById("staffPeriod").textContent = `(${monthDisplay})`;
+  const staffTbody = document.querySelector("#staffTable tbody");
+  staffTbody.innerHTML = "";
+  const staffNames = [];
+  const staffResolved = [];
+  Object.keys(staffStatsMap).forEach(name => {
+    const s = staffStatsMap[name];
+    if (s.totalComplaints === 0 && s.downtime === 0) return;
+    const avg = s.resolvedCount > 0 ? Math.round(s.totalTime / s.resolvedCount) : 0;
+    const rate = s.totalComplaints > 0 ? Math.round((s.resolved / s.totalComplaints) * 100) : 0;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${name}</td><td>${s.resolved}</td><td>${s.pending}</td><td>${s.downtime}</td><td>${avg}</td><td>${rate}%</td>`;
+    staffTbody.appendChild(tr);
+    staffNames.push(name.split(' ')[0]);
+    staffResolved.push(s.resolved);
+  });
+  if (staffChart) staffChart.destroy();
+  if (staffNames.length > 0) {
+    staffChart = createBarChart(document.getElementById("staffChart"), staffNames, staffResolved);
+  }
 }
-// -------------------------- SAVE/LOAD --------------------------
-function storageKeyForYear(year){ return "automatedMetrics"+year; }
+
+// Charts
+function createPieChart(ctx, resolved, pending, downtime, title) {
+  return new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: ['Resolved', 'Pending', 'Downtime'],
+      datasets: [{
+        data: [resolved, pending, downtime],
+        backgroundColor: ['#27ae60', '#f39c12', '#e74c3c'],
+        hoverBackgroundColor: ['#2ecc71', '#f1c40f', '#c0392b'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+              const perc = Math.round((ctx.raw / total) * 100);
+              return `${ctx.label}: ${ctx.raw} (${perc}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function createBarChart(ctx, names, data) {
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [{
+        label: 'Resolved',
+        data: data,
+        backgroundColor: '#27ae60',
+        hoverBackgroundColor: '#2ecc71'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+// Storage functions
+function storageKeyForYear(year) { return "automatedMetrics" + year; }
 function saveData() {
-  const data=[];
-  document.querySelectorAll("#tableBody tr").forEach(row=>{
+  const data = [];
+  document.querySelectorAll("#tableBody tr").forEach(row => {
     data.push({
-      date: row.querySelector(".row-date")?.value||"",
-      shift: row.querySelector(".row-shift")?.value||"",
-      staff: row.querySelector(".row-staff")?.value||"",
-      product: row.querySelector(".product-select")?.value||"",
-      response: row.querySelector(".response-input")?.value||"",
-      resolution: row.querySelector(".resolution-input")?.value||"",
-      duration: row.querySelector(".cell-duration")?.textContent||"0",
-      status: row.querySelector(".status-select")?.value||"",
-      notes: row.querySelector(".notes-textarea")?.value||""
+      date: row.querySelector(".row-date")?.value || "",
+      shift: row.querySelector(".row-shift")?.value || "",
+      staff: row.querySelector(".row-staff")?.value || "",
+      product: row.querySelector(".product-select")?.value || "",
+      response: row.querySelector(".response-input")?.value || "",
+      resolution: row.querySelector(".resolution-input")?.value || "",
+      duration: row.querySelector(".cell-duration")?.textContent || "0",
+      status: row.querySelector(".status-select")?.value || "",
+      notes: row.querySelector(".notes-textarea")?.value || ""
     });
   });
   localStorage.setItem(storageKeyForYear(selectedYear), JSON.stringify(data));
 }
 function loadData() {
-  const tbody=document.getElementById("tableBody"); tbody.innerHTML="";
-  const saved=localStorage.getItem(storageKeyForYear(selectedYear));
-  if(saved){ try{ const data=JSON.parse(saved); data.forEach(item=>tbody.appendChild(createRowElement(item))); }catch(e){console.error(e);} }
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+  const saved = localStorage.getItem(storageKeyForYear(selectedYear));
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      data.forEach(item => tbody.appendChild(createRowElement(item)));
+    } catch (e) { console.error(e); }
+  }
   updateSummary();
 }
-// -------------------------- BACKUP/RESTORE --------------------------
 function backupData() {
-  const allYears={}; for(let y=2026;y<=2030;y++){ allYears[y]=JSON.parse(localStorage.getItem(storageKeyForYear(y))||"[]"); }
-  const blob=new Blob([JSON.stringify(allYears,null,2)],{type:"application/json"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="automated_Metrics_Backup.json"; document.body.appendChild(a); a.click(); a.remove();
+  const allYears = {};
+  for (let y = 2026; y <= 2030; y++) {
+    allYears[y] = JSON.parse(localStorage.getItem(storageKeyForYear(y)) || "[]");
+  }
+  const blob = new Blob([JSON.stringify(allYears, null, 2)], {type: "application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "automated_Metrics_Backup.json";
+  document.body.appendChild(a); a.click(); a.remove();
 }
 function restoreBackup(e) {
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(evt){
-    try{ const data=JSON.parse(evt.target.result); for(let y=2026;y<=2030;y++){ localStorage.setItem(storageKeyForYear(y), JSON.stringify(data[y]||[])); } alert("Backup restored successfully!"); loadData(); } catch(err){ alert("Invalid backup file."); console.error(err); } finally{ e.target.value=""; }
-  }; reader.readAsText(file);
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = JSON.parse(evt.target.result);
+      for (let y = 2026; y <= 2030; y++) {
+        localStorage.setItem(storageKeyForYear(y), JSON.stringify(data[y] || []));
+      }
+      alert("Backup restored successfully!");
+      loadData();
+    } catch (err) {
+      alert("Invalid backup file.");
+      console.error(err);
+    } finally { e.target.value = ""; }
+  };
+  reader.readAsText(file);
 }
-function clearAllData(){ if(confirm("Delete ALL data for year "+selectedYear+"?")){ localStorage.removeItem(storageKeyForYear(selectedYear)); document.getElementById("tableBody").innerHTML=""; updateSummary(); }}
-// -------------------------- EXPORT/PREVIEW --------------------------
-function escapeHtml(text){ return text?String(text).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):""; }
-function previewData(){
-  const preview=window.open("","_blank"); let html=`<html><head><title>Preview</title><style>body{font-family:Arial;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #aaa;padding:8px;text-align:center;}th{background:#3498db;color:white;}</style></head><body><h2>Automated Time Metrics (Print Preview)</h2><table><thead><tr><th>Date</th><th>Shift</th><th>Staff</th><th>Product</th><th>Response</th><th>Resolution</th><th>Duration</th><th>Status</th><th>Notes</th></tr></thead><tbody>`;
-  document.querySelectorAll("#tableBody tr").forEach(row=>{
-    html+=`<tr><td>${escapeHtml(row.querySelector(".row-date")?.value)}</td><td>${escapeHtml(row.querySelector(".row-shift")?.value)}</td><td>${escapeHtml(row.querySelector(".row-staff")?.value)}</td><td>${escapeHtml(row.querySelector(".product-select")?.value)}</td><td>${escapeHtml(row.querySelector(".response-input")?.value)}</td><td>${escapeHtml(row.querySelector(".resolution-input")?.value)}</td><td>${escapeHtml(row.querySelector(".cell-duration")?.textContent)}</td><td>${escapeHtml(row.querySelector(".status-select")?.value)}</td><td>${escapeHtml(row.querySelector(".notes-textarea")?.value)}</td></tr>`;
+function clearAllData() {
+  if (confirm("Delete ALL data for year " + selectedYear + "?")) {
+    localStorage.removeItem(storageKeyForYear(selectedYear));
+    document.getElementById("tableBody").innerHTML = "";
+    updateSummary();
+  }
+}
+function escapeHtml(text) {
+  return text ? String(text).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;") : "";
+}
+function previewData() {
+  const preview = window.open("", "_blank");
+  let html = `<html><head><title>Preview</title><style>body{font-family:Arial;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #aaa;padding:8px;text-align:center;}th{background:#3498db;color:white;}</style></head><body><h2>Automated Time Metrics (Print Preview)</h2><table><thead><tr><th>Date</th><th>Shift</th><th>Staff</th><th>Product</th><th>Response</th><th>Resolution</th><th>Duration</th><th>Status</th><th>Notes</th></tr></thead><tbody>`;
+  document.querySelectorAll("#tableBody tr").forEach(row => {
+    html += `<tr><td>${escapeHtml(row.querySelector(".row-date")?.value)}</td><td>${escapeHtml(row.querySelector(".row-shift")?.value)}</td><td>${escapeHtml(row.querySelector(".row-staff")?.value)}</td><td>${escapeHtml(row.querySelector(".product-select")?.value)}</td><td>${escapeHtml(row.querySelector(".response-input")?.value)}</td><td>${escapeHtml(row.querySelector(".resolution-input")?.value)}</td><td>${escapeHtml(row.querySelector(".cell-duration")?.textContent)}</td><td>${escapeHtml(row.querySelector(".status-select")?.value)}</td><td>${escapeHtml(row.querySelector(".notes-textarea")?.value)}</td></tr>`;
   });
-  html+="</tbody></table></body></html>"; preview.document.write(html); preview.document.close();
+  html += "</tbody></table></body></html>";
+  preview.document.write(html);
+  preview.document.close();
 }
-function exportToExcel(){
-  const rows=[["Date","Shift","Staff","Product","Response","Resolution","Duration (min)","Status","Notes"]];
-  document.querySelectorAll("#tableBody tr").forEach(row=>rows.push([
-    row.querySelector(".row-date")?.value,
-    row.querySelector(".row-shift")?.value,
-    row.querySelector(".row-staff")?.value,
-    row.querySelector(".product-select")?.value,
-    row.querySelector(".response-input")?.value,
-    row.querySelector(".resolution-input")?.value,
-    row.querySelector(".cell-duration")?.textContent,
-    row.querySelector(".status-select")?.value,
-    row.querySelector(".notes-textarea")?.value
+function exportToExcel() {
+  const rows = [["Date","Shift","Staff","Product","Response","Resolution","Duration (min)","Status","Notes"]];
+  document.querySelectorAll("#tableBody tr").forEach(row => rows.push([
+    row.querySelector(".row-date")?.value || "",
+    row.querySelector(".row-shift")?.value || "",
+    row.querySelector(".row-staff")?.value || "",
+    row.querySelector(".product-select")?.value || "",
+    row.querySelector(".response-input")?.value || "",
+    row.querySelector(".resolution-input")?.value || "",
+    row.querySelector(".cell-duration")?.textContent || "0",
+    row.querySelector(".status-select")?.value || "",
+    row.querySelector(".notes-textarea")?.value || ""
   ]));
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  const wb=XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Metrics");
   XLSX.writeFile(wb, `automated_metrics_${selectedYear}.xlsx`);
 }
-// -------------------------- AUTOSAVE --------------------------
-function startAutosave(){
-  if(autosaveIntervalHandle) clearInterval(autosaveIntervalHandle);
-  autosaveIntervalHandle=setInterval(saveData,AUTOSAVE_INTERVAL_MS);
+function startAutosave() {
+  if (autosaveIntervalHandle) clearInterval(autosaveIntervalHandle);
+  autosaveIntervalHandle = setInterval(saveData, AUTOSAVE_INTERVAL_MS);
   window.removeEventListener("beforeunload", onBeforeUnloadSave);
   window.addEventListener("beforeunload", onBeforeUnloadSave);
 }
-function onBeforeUnloadSave(){ saveData(); }
-// -------------------------- INIT --------------------------
-document.getElementById("metricYear").value=String(selectedYear);
-generateMondays(selectedYear); loadData(); startAutosave();
-document.addEventListener("focusout",(e)=>{ if(e.target?.matches(".row-date,.row-shift,.row-staff,.product-select,.response-input,.resolution-input,.status-select,.notes-textarea")){ const r=e.target.closest("tr"); if(r) calculateDurationForRow(r); saveData(); updateSummary(); }});
+function onBeforeUnloadSave() { saveData(); }
+
+// Init
+document.getElementById("metricYear").value = String(selectedYear);
+generateMondays(selectedYear);
+loadData();
+startAutosave();
+
+document.addEventListener("focusout", (e) => {
+  if (e.target?.matches(".row-date,.row-shift,.row-staff,.product-select,.response-input,.resolution-input,.status-select,.notes-textarea")) {
+    const r = e.target.closest("tr");
+    if (r) calculateDurationForRow(r);
+    saveData();
+    updateSummary();
+  }
+});
 </script>
 </body>
 </html>
