@@ -44,11 +44,9 @@
 </style>
 </head>
 <body>
-
 <div class="container">
   <h1>Automated Time Metric</h1>
   <h2>Customer Service Time Metrics Tracker</h2>
-
   <div class="controls">
     <label class="small">Select Year:</label>
     <select id="metricYear" onchange="updateYear()">
@@ -58,17 +56,14 @@
       <option value="2029">2029</option>
       <option value="2030">2030</option>
     </select>
-
     <label class="small" style="margin-left:10px">Date (Mondays only):</label>
     <input type="date" id="metricDate">
-
     <label class="small" style="margin-left:10px">Shift:</label>
     <select id="shift">
       <option value="">--Select Shift--</option>
       <option value="Morning">Morning Shift</option>
       <option value="Night">Night Shift</option>
     </select>
-
     <label class="small" style="margin-left:10px">Staff:</label>
     <select id="staff">
       <option value="">-- Select Staff --</option>
@@ -77,10 +72,8 @@
       <option>Jolaiya Adejumoke</option>
       <option>Olabiyi Oluwafemisii</option>
     </select>
-
     <button class="btn btn-add" onclick="addRowFromTop()">Add Entry</button>
   </div>
-
   <div class="table-wrapper">
     <table id="metricsTable">
       <thead>
@@ -100,15 +93,15 @@
       <tbody id="tableBody"></tbody>
     </table>
   </div>
-
   <div class="summary">
     <h3>Summary</h3>
     <p>Weekly Total Resolved: <span id="weeklyResolved">0</span> |
        Weekly Pending: <span id="weeklyPending">0</span> |
        Weekly Downtime: <span id="weeklyDowntime">0</span></p>
+    <p>Average Handling Time per Chat: <span id="avgHandlingTime">0</span> minutes</p>
+    <p>Complaint Resolution Rate: <span id="resolutionRate">0</span>%</p>
     <p>Monthly Average Resolution Time: <span id="monthlyAvg">0</span> minutes</p>
   </div>
-
   <div class="controls">
     <button class="btn btn-export" onclick="exportToExcel()">Export to Excel</button>
     <button class="btn btn-preview" onclick="previewData()">Preview</button>
@@ -118,7 +111,6 @@
     <button class="btn btn-clear" onclick="clearAllData()">Clear All Data</button>
   </div>
 </div>
-
 <script>
 // ------------------------------ GLOBAL VARIABLES -------------------------------
 const products = [
@@ -134,18 +126,15 @@ const products = [
   "Cable Subscription",
   "Data"
 ];
-
 let selectedYear = 2026;
 let autosaveIntervalHandle = null;
 const AUTOSAVE_INTERVAL_MS = 10000;
-
 // ----------------------- YEAR & DATE HANDLING -----------------------
 function updateYear() {
   selectedYear = parseInt(document.getElementById("metricYear").value, 10);
   generateMondays(selectedYear);
   loadData();
 }
-
 function generateMondays(year) {
   const dateInput = document.getElementById("metricDate");
   let mondays = [];
@@ -162,7 +151,6 @@ function generateMondays(year) {
     mondays.push(new Date(d));
     d.setDate(d.getDate() + 7);
   }
-
   if (mondays.length > 0) {
     dateInput.min = mondays[0].toISOString().split("T")[0];
     dateInput.max = mondays[mondays.length - 1].toISOString().split("T")[0];
@@ -170,7 +158,6 @@ function generateMondays(year) {
     dateInput.removeAttribute("min");
     dateInput.removeAttribute("max");
   }
-
   dateInput.oninput = function () {
     if (!this.value) return;
     const s = new Date(this.value + "T00:00:00");
@@ -180,7 +167,6 @@ function generateMondays(year) {
     }
   };
 }
-
 // ---------------------------- ROW CREATION & LISTENERS -----------------------------
 function createRowElement(item = null) {
   const row = document.createElement("tr");
@@ -193,7 +179,6 @@ function createRowElement(item = null) {
   const durationVal = item?.duration || "0";
   const statusVal = item?.status || "Select Status";
   const notesVal = item?.notes || "";
-
   row.innerHTML = `
     <td class="cell-date"><input type="date" class="row-date" value="${escapeHtml(dateVal)}"></td>
     <td class="cell-shift">
@@ -232,7 +217,6 @@ function createRowElement(item = null) {
       <button class="row-action-btn row-delete" title="Delete row">Delete</button>
     </td>
   `;
-
   const dateInput = row.querySelector(".row-date");
   const shiftSelect = row.querySelector(".row-shift");
   const staffSelect = row.querySelector(".row-staff");
@@ -244,28 +228,23 @@ function createRowElement(item = null) {
   const notesTextarea = row.querySelector(".notes-textarea");
   const addBtn = row.querySelector(".row-add");
   const deleteBtn = row.querySelector(".row-delete");
-
   dateInput.addEventListener("change", function () {
     if (!this.value) { saveData(); updateSummary(); return; }
     const dt = new Date(this.value + "T00:00:00");
     if (dt.getDay() !== 1) { alert("Please select a Monday only!"); this.value = ""; }
     saveData(); updateSummary();
   });
-
   [shiftSelect, staffSelect, productSelect].forEach(el => el.addEventListener("change", () => { saveData(); updateSummary(); }));
   responseInput.addEventListener("change", () => { calculateDurationForRow(row); saveData(); updateSummary(); });
   resolutionInput.addEventListener("change", () => { calculateDurationForRow(row); saveData(); updateSummary(); });
   statusSelect.addEventListener("change", () => { applyStatusClassToRow(row, statusSelect.value); saveData(); updateSummary(); });
   notesTextarea.addEventListener("input", () => { saveData(); });
-
   deleteBtn.addEventListener("click", () => { if (confirm("Delete this row?")) { row.remove(); saveData(); updateSummary(); } });
   addBtn.addEventListener("click", () => { const newRow = createRowElement(null); row.parentNode.insertBefore(newRow, row.nextSibling); const firstInput = newRow.querySelector(".row-date") || newRow.querySelector(".row-shift"); if(firstInput) firstInput.focus(); saveData(); updateSummary(); });
-
   applyStatusClassToRow(row, statusVal);
   if(responseInput.value || resolutionInput.value) calculateDurationForRow(row);
   return row;
 }
-
 // -------------------------- ADD ROW FROM TOP --------------------------
 function addRowFromTop() {
   const date = document.getElementById("metricDate").value;
@@ -279,13 +258,17 @@ function addRowFromTop() {
   if (firstInput) firstInput.focus();
   saveData(); updateSummary();
 }
-
 // -------------------------- DURATION & STATUS --------------------------
 function calculateDurationForRow(row) {
   const resp = row.querySelector(".response-input")?.value;
   const reso = row.querySelector(".resolution-input")?.value;
   const durationCell = row.querySelector(".cell-duration");
-  if(resp && reso) { const diff = Math.round((new Date(reso)-new Date(resp))/60000); durationCell.textContent = diff>0?diff:0; } else { durationCell.textContent = "0"; }
+  if(resp && reso) { 
+    const diff = Math.round((new Date(reso)-new Date(resp))/60000); 
+    durationCell.textContent = diff>0?diff:0; 
+  } else { 
+    durationCell.textContent = "0"; 
+  }
 }
 function applyStatusClassToRow(row, value) {
   row.classList.remove("pending","resolved","downtime");
@@ -293,22 +276,48 @@ function applyStatusClassToRow(row, value) {
   if(value==="Resolved") row.classList.add("resolved");
   if(value==="Downtime") row.classList.add("downtime");
 }
-
 // -------------------------- SUMMARY --------------------------
 function updateSummary() {
   const rows = document.querySelectorAll("#tableBody tr");
-  let resolved=0,pending=0,downtime=0,totalTime=0,count=0;
-  rows.forEach(row=>{
-    const status=row.querySelector(".status-select").value;
-    const dur=parseInt(row.querySelector(".cell-duration").textContent)||0;
-    if(status==="Resolved"){ resolved++; if(dur>0){totalTime+=dur; count++;} } else if(status==="Pending"){ pending++; } else if(status==="Downtime"){ downtime++; }
-  });
-  document.getElementById("weeklyResolved").textContent=resolved;
-  document.getElementById("weeklyPending").textContent=pending;
-  document.getElementById("weeklyDowntime").textContent=downtime;
-  document.getElementById("monthlyAvg").textContent=count>0?Math.round(totalTime/count):0;
-}
+  let resolved = 0, pending = 0, downtime = 0;
+  let totalTime = 0, resolvedCount = 0;
+  let totalComplaints = 0; // excludes Downtime
 
+  rows.forEach(row => {
+    const status = row.querySelector(".status-select").value;
+    const dur = parseInt(row.querySelector(".cell-duration").textContent) || 0;
+
+    if (status === "Resolved") {
+      resolved++;
+      if (dur > 0) {
+        totalTime += dur;
+        resolvedCount++;
+      }
+      totalComplaints++;
+    } else if (status === "Pending") {
+      pending++;
+      totalComplaints++;
+    } else if (status === "Downtime") {
+      downtime++;
+    }
+  });
+
+  // Update counts
+  document.getElementById("weeklyResolved").textContent = resolved;
+  document.getElementById("weeklyPending").textContent = pending;
+  document.getElementById("weeklyDowntime").textContent = downtime;
+
+  // Average Handling Time per Chat (for Resolved)
+  const avgHandling = resolvedCount > 0 ? Math.round(totalTime / resolvedCount) : 0;
+  document.getElementById("avgHandlingTime").textContent = avgHandling;
+
+  // Complaint Resolution Rate (%)
+  const resolutionRate = totalComplaints > 0 ? Math.round((resolved / totalComplaints) * 100) : 0;
+  document.getElementById("resolutionRate").textContent = resolutionRate;
+
+  // Existing Monthly Average (kept for backward compatibility)
+  document.getElementById("monthlyAvg").textContent = resolvedCount > 0 ? Math.round(totalTime / resolvedCount) : 0;
+}
 // -------------------------- SAVE/LOAD --------------------------
 function storageKeyForYear(year){ return "automatedMetrics"+year; }
 function saveData() {
@@ -334,7 +343,6 @@ function loadData() {
   if(saved){ try{ const data=JSON.parse(saved); data.forEach(item=>tbody.appendChild(createRowElement(item))); }catch(e){console.error(e);} }
   updateSummary();
 }
-
 // -------------------------- BACKUP/RESTORE --------------------------
 function backupData() {
   const allYears={}; for(let y=2026;y<=2030;y++){ allYears[y]=JSON.parse(localStorage.getItem(storageKeyForYear(y))||"[]"); }
@@ -349,7 +357,6 @@ function restoreBackup(e) {
   }; reader.readAsText(file);
 }
 function clearAllData(){ if(confirm("Delete ALL data for year "+selectedYear+"?")){ localStorage.removeItem(storageKeyForYear(selectedYear)); document.getElementById("tableBody").innerHTML=""; updateSummary(); }}
-
 // -------------------------- EXPORT/PREVIEW --------------------------
 function escapeHtml(text){ return text?String(text).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):""; }
 function previewData(){
@@ -377,7 +384,6 @@ function exportToExcel(){
   XLSX.utils.book_append_sheet(wb, ws, "Metrics");
   XLSX.writeFile(wb, `automated_metrics_${selectedYear}.xlsx`);
 }
-
 // -------------------------- AUTOSAVE --------------------------
 function startAutosave(){
   if(autosaveIntervalHandle) clearInterval(autosaveIntervalHandle);
@@ -386,12 +392,10 @@ function startAutosave(){
   window.addEventListener("beforeunload", onBeforeUnloadSave);
 }
 function onBeforeUnloadSave(){ saveData(); }
-
 // -------------------------- INIT --------------------------
 document.getElementById("metricYear").value=String(selectedYear);
 generateMondays(selectedYear); loadData(); startAutosave();
 document.addEventListener("focusout",(e)=>{ if(e.target?.matches(".row-date,.row-shift,.row-staff,.product-select,.response-input,.resolution-input,.status-select,.notes-textarea")){ const r=e.target.closest("tr"); if(r) calculateDurationForRow(r); saveData(); updateSummary(); }});
 </script>
-
 </body>
 </html>
