@@ -123,7 +123,7 @@
       <p>Resolved: <span id="yearlyResolved">0</span> |
          Pending: <span id="yearlyPending">0</span> |
          Downtime: <span id="yearlyDowntime">0</span></p>
-      <p>Average Handling Time: <span id="yearlyAvgHandling">0</span> minutes</p>
+      <p>Average Handling Time per Chat: <span id="yearlyAvgHandling">0</span> minutes</p>
       <p>Resolution Rate: <span id="yearlyResolutionRate">0</span>%</p>
       <div class="chart-container">
         <canvas id="yearlyChart"></canvas>
@@ -135,7 +135,7 @@
       <p>Resolved: <span id="weeklyResolved">0</span> |
          Pending: <span id="weeklyPending">0</span> |
          Downtime: <span id="weeklyDowntime">0</span></p>
-      <p>Average Handling Time: <span id="weeklyAvgHandling">0</span> minutes</p>
+      <p>Average Handling Time per Chat: <span id="weeklyAvgHandling">0</span> minutes</p>
       <p>Resolution Rate: <span id="weeklyResolutionRate">0</span>%</p>
       <div class="chart-container">
         <canvas id="weeklyChart"></canvas>
@@ -147,7 +147,7 @@
       <p>Resolved: <span id="monthlyResolved">0</span> |
          Pending: <span id="monthlyPending">0</span> |
          Downtime: <span id="monthlyDowntime">0</span></p>
-      <p>Average Handling Time: <span id="monthlyAvgHandling">0</span> minutes</p>
+      <p>Average Handling Time per Chat: <span id="monthlyAvgHandling">0</span> minutes</p>
       <p>Resolution Rate: <span id="monthlyResolutionRate">0</span>%</p>
       <div class="chart-container">
         <canvas id="monthlyChart"></canvas>
@@ -159,7 +159,7 @@
       <p>Resolved: <span id="quarterlyResolved">0</span> |
          Pending: <span id="quarterlyPending">0</span> |
          Downtime: <span id="quarterlyDowntime">0</span></p>
-      <p>Average Handling Time: <span id="quarterlyAvgHandling">0</span> minutes</p>
+      <p>Average Handling Time per Chat: <span id="quarterlyAvgHandling">0</span> minutes</p>
       <p>Resolution Rate: <span id="quarterlyResolutionRate">0</span>%</p>
       <div class="chart-container">
         <canvas id="quarterlyChart"></canvas>
@@ -176,7 +176,7 @@
               <th>Resolved</th>
               <th>Pending</th>
               <th>Downtime</th>
-              <th>Avg Handling Time (min)</th>
+              <th>Avg Handling Time per Chat (min)</th>
               <th>Resolution Rate (%)</th>
             </tr>
           </thead>
@@ -282,7 +282,6 @@ function onDateSelected() {
   currentMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
   currentQuarter = getQuarterFromDate(currentSelectedDate);
 
-  // Month selector
   const monthSelect = document.getElementById("monthSelector");
   monthSelect.innerHTML = "";
   const tempDate = new Date(year, 0, 1);
@@ -296,7 +295,6 @@ function onDateSelected() {
   }
   document.getElementById("monthSelectorContainer").style.display = "inline";
 
-  // Quarter selector
   const quarterSelect = document.getElementById("quarterSelector");
   quarterSelect.innerHTML = "";
   for (let q = 1; q <= 4; q++) {
@@ -337,7 +335,7 @@ function toggleSummary() {
   if (summarySection.style.display === "none" || summarySection.style.display === "") {
     summarySection.style.display = "block";
     btn.textContent = "Hide Summary";
-    updateSummary(); // Refresh charts when shown
+    updateSummary();
   } else {
     summarySection.style.display = "none";
     btn.textContent = "Show Summary";
@@ -536,7 +534,6 @@ function updateSummary() {
     return {resolved: stats.resolved, pending: stats.pending, downtime: stats.downtime};
   }
 
-  // Render all summaries
   renderStats(yearlyStats, "yearly"); document.getElementById("yearlyPeriod").textContent = `(${selectedYear})`;
   renderStats(weekStats, "weekly"); document.getElementById("weeklyPeriod").textContent = weekMondayStr ? `(Week of ${weekMondayStr})` : "(No week selected)";
   renderStats(monthStats, "monthly"); const monthDisplay = currentMonth ? new Date(currentMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' }) : "N/A"; document.getElementById("monthlyPeriod").textContent = `(${monthDisplay})`;
